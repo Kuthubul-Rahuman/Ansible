@@ -569,9 +569,14 @@ def get_submodule_versions(git_path, module, dest, version='HEAD'):
 
 def get_submodule_config(git_path, module, dest, submodule_name, config_name):
     config_path = 'submodule.' + submodule_name + '.' + config_name
-    cmd = [git_path, 'config', '-f', '.gitmodules', '--default', 'master', '--get', config_path]
+    cmd = [git_path, 'config', '-f', '.gitmodules', '--get', config_path]
     (rc, out, err) = module.run_command(cmd, cwd=dest)
-    return out.rstrip('\n')
+
+    out =out.rstrip('\n')
+    # if we can't resolve the actual branch, assume its master.
+    if not out:
+        out = "master"
+    return out
 
 
 def get_submodule_versions_from_remote(git_path, module, dest, submodule_revisions):
