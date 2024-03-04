@@ -17,18 +17,24 @@
 
 from __future__ import annotations
 
+import contextlib
+import errno
+import fcntl
 import os
-import sys
+import termios
 import traceback
-
-from jinja2.exceptions import TemplateNotFound
 from multiprocessing.queues import Queue
 
+from ansible import context
 from ansible.errors import AnsibleConnectionFailure, AnsibleError
 from ansible.executor.task_executor import TaskExecutor
+from ansible.module_utils.common.collections import is_sequence
 from ansible.module_utils.common.text.converters import to_text
+from ansible.plugins.loader import init_plugin_loader
 from ansible.utils.display import Display
 from ansible.utils.multiprocessing import context as multiprocessing_context
+
+from jinja2.exceptions import TemplateNotFound
 
 __all__ = ['WorkerProcess']
 
@@ -73,23 +79,6 @@ class WorkerProcess(multiprocessing_context.Process):  # type: ignore[name-defin
         self.worker_queue = WorkerQueue(ctx=multiprocessing_context)
         self.worker_id = worker_id
 
-    def _save_stdin(self):
-        self._new_stdin = None
-        try:
-            if sys.stdin.isatty() and sys.stdin.fileno() is not None:
-                try:
-                    self._new_stdin = os.fdopen(os.dup(sys.stdin.fileno()))
-                except OSError:
-                    # couldn't dupe stdin, most likely because it's
-                    # not a valid file descriptor
-                    pass
-        except (AttributeError, ValueError):
-            # couldn't get stdin's fileno
-            pass
-
-        if self._new_stdin is None:
-            self._new_stdin = open(os.devnull)
-
     def start(self):
         '''
         multiprocessing.Process replaces the worker's stdin with a new file
@@ -99,13 +88,25 @@ class WorkerProcess(multiprocessing_context.Process):  # type: ignore[name-defin
         make sure it is closed in the parent when start() completes.
         '''
 
-        self._save_stdin()
         # FUTURE: this lock can be removed once a more generalized pre-fork thread pause is in place
         with display._lock:
+            if multiprocessing_context.get_start_method() == 'fork':
+                self._master, self._slave = os.openpty()
+                cm = contextlib.ExitStack()
+                cm.callback(os.close, self._slave)
+            else:
+                cm = contextlib.nullcontext()
+            with cm:
+                super(WorkerProcess, self).start()
+
+    def terminate(self):
+        if multiprocessing_context.get_start_method() == 'fork':
             try:
-                return super(WorkerProcess, self).start()
-            finally:
-                self._new_stdin.close()
+                os.close(self._master)
+            except OSError as e:
+                if e.errno != errno.EBADF:
+                    raise
+        super().terminate()
 
     def _hard_exit(self, e):
         '''
@@ -125,6 +126,30 @@ class WorkerProcess(multiprocessing_context.Process):  # type: ignore[name-defin
 
         os._exit(1)
 
+    def _detach(self):
+        '''
+        The intent here is to detach the child process from the inherited stdio fds,
+        including /dev/tty. Children should use Display, instead of direct interactions
+        with stdio fds.
+        '''
+
+        if multiprocessing_context.get_start_method() != 'fork':
+            # If we aren't forking, we don't have inherited pty
+            _, self._slave = os.openpty()
+        else:
+            os.close(self._master)
+
+        try:
+            os.login_tty(self._slave)
+        except AttributeError:
+            # deprecated: description='os.login_tty fallback' python_version='3.11'
+            os.setsid()
+            fcntl.ioctl(self._slave, termios.TIOCSCTTY)
+            os.dup2(self._slave, 0)
+            os.dup2(self._slave, 1)
+            os.dup2(self._slave, 2)
+            os.close(self._slave)
+
     def run(self):
         '''
         Wrap _run() to ensure no possibility an errant exception can cause
@@ -136,23 +161,10 @@ class WorkerProcess(multiprocessing_context.Process):  # type: ignore[name-defin
         to suddenly assume the role and prior state of its parent.
         '''
         try:
+            self._detach()
             return self._run()
-        except BaseException as e:
-            self._hard_exit(e)
-        finally:
-            # This is a hack, pure and simple, to work around a potential deadlock
-            # in ``multiprocessing.Process`` when flushing stdout/stderr during process
-            # shutdown.
-            #
-            # We should no longer have a problem with ``Display``, as it now proxies over
-            # the queue from a fork. However, to avoid any issues with plugins that may
-            # be doing their own printing, this has been kept.
-            #
-            # This happens at the very end to avoid that deadlock, by simply side
-            # stepping it. This should not be treated as a long term fix.
-            #
-            # TODO: Evaluate migrating away from the ``fork`` multiprocessing start method.
-            sys.stdout = sys.stderr = open(os.devnull, 'w')
+        except BaseException:
+            self._hard_exit(traceback.format_exc())
 
     def _run(self):
         '''
@@ -171,6 +183,14 @@ class WorkerProcess(multiprocessing_context.Process):  # type: ignore[name-defin
         global current_worker
         current_worker = self
 
+        if multiprocessing_context.get_start_method() != 'fork':
+            # Initialize plugin loader after parse, so that the init code can utilize parsed arguments
+            cli_collections_path = context.CLIARGS.get('collections_path') or []
+            if not is_sequence(cli_collections_path):
+                # In some contexts ``collections_path`` is singular
+                cli_collections_path = [cli_collections_path]
+            init_plugin_loader(cli_collections_path)
+
         try:
             # execute the task and build a TaskResult from the result
             display.debug("running TaskExecutor() for %s/%s" % (self._host, self._task))
@@ -179,7 +199,6 @@ class WorkerProcess(multiprocessing_context.Process):  # type: ignore[name-defin
                 self._task,
                 self._task_vars,
                 self._play_context,
-                self._new_stdin,
                 self._loader,
                 self._shared_loader_obj,
                 self._final_q,

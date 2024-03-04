@@ -204,9 +204,8 @@ class TestConnectionPSRP(object):
                              ((o, e) for o, e in OPTIONS_DATA))
     def test_set_options(self, options, expected):
         pc = PlayContext()
-        new_stdin = StringIO()
 
-        conn = connection_loader.get('psrp', pc, new_stdin)
+        conn = connection_loader.get('psrp', pc)
         conn.set_options(var_options=options)
         conn._build_kwargs()
 
@@ -218,9 +217,8 @@ class TestConnectionPSRP(object):
 
     def test_set_invalid_extras_options(self, monkeypatch):
         pc = PlayContext()
-        new_stdin = StringIO()
 
-        conn = connection_loader.get('psrp', pc, new_stdin)
+        conn = connection_loader.get('psrp', pc)
         conn.set_options(var_options={'_extras': {'ansible_psrp_mock_test3': True}})
 
         mock_display = MagicMock()
