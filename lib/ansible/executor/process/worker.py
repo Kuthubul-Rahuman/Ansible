@@ -17,8 +17,11 @@
 
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import os
 import sys
+import termios
 import traceback
 from multiprocessing.queues import Queue
 
@@ -56,7 +59,7 @@ class WorkerProcess(multiprocessing_context.Process):  # type: ignore[name-defin
     for reading later.
     '''
 
-    def __init__(self, final_q, task_vars, host, task, play_context, loader, variable_manager, shared_loader_obj, worker_id):
+    def __init__(self, final_q, task_vars, host, task, play_context, loader, variable_manager, shared_loader_obj, worker_id, cliargs):
 
         super(WorkerProcess, self).__init__()
         # takes a task queue manager as the sole param:
@@ -75,9 +78,13 @@ class WorkerProcess(multiprocessing_context.Process):  # type: ignore[name-defin
 
         self.worker_queue = WorkerQueue(ctx=multiprocessing_context)
         self.worker_id = worker_id
+
+        self._cliargs = cliargs
+
         self._detached = False
         self._detach_error = None
-        self._io = None
+        self._master = None
+        self._slave = None
 
     def start(self):
         '''
@@ -89,8 +96,19 @@ class WorkerProcess(multiprocessing_context.Process):  # type: ignore[name-defin
         '''
 
         # FUTURE: this lock can be removed once a more generalized pre-fork thread pause is in place
-        with display._lock:
+        if multiprocessing_context.get_start_method() == 'fork':
+            self._master, self._slave = os.openpty()
+            cm = contextlib.ExitStack()
+            cm.callback(os.close, self._slave)
+        else:
+            cm = contextlib.nullcontext()
+        with display._lock, cm:
             super(WorkerProcess, self).start()
+
+    def terminate(self):
+        if self._master:
+            os.close(self._master)
+        super().terminate()
 
     def _hard_exit(self, e):
         '''
@@ -110,6 +128,7 @@ class WorkerProcess(multiprocessing_context.Process):  # type: ignore[name-defin
 
         os._exit(1)
 
+    @contextlib.contextmanager
     def _detach(self):
         '''
         The intent here is to detach the child process from the inherited stdio fds,
@@ -117,9 +136,15 @@ class WorkerProcess(multiprocessing_context.Process):  # type: ignore[name-defin
         with stdio fds.
         '''
         try:
-            os.setsid()
-            self._io = open(os.devnull, 'w')  # type: ignore[misc]
-            sys.stdin = sys.__stdin__ = self._io  # type: ignore[misc]
+            if multiprocessing_context.get_start_method() != 'fork':
+                # If we aren't forking, we don't have inherited pty
+                _io = open(os.devnull, 'w')
+            else:
+                os.close(self._master)
+                os.setsid()
+                fcntl.ioctl(self._slave, termios.TIOCSCTTY)
+                _io = os.fdopen(self._slave, 'w')
+            sys.stdin = sys.__stdin__ = _io  # type: ignore[misc]
             sys.stdout = sys.__stdout__ = sys.stdin  # type: ignore[misc]
             sys.stderr = sys.__stderr__ = sys.stdin  # type: ignore[misc]
         except Exception as e:
@@ -127,6 +152,11 @@ class WorkerProcess(multiprocessing_context.Process):  # type: ignore[name-defin
             self._detach_error = (e, traceback.format_exc())
         else:
             self._detached = True
+
+        yield
+
+        if self._slave:
+            os.close(self._slave)
 
     def run(self):
         '''
@@ -139,13 +169,11 @@ class WorkerProcess(multiprocessing_context.Process):  # type: ignore[name-defin
         to suddenly assume the role and prior state of its parent.
         '''
         try:
-            self._detach()
-            return self._run()
+            display.set_queue(self._final_q)
+            with self._detach():
+                return self._run()
         except BaseException:
             self._hard_exit(traceback.format_exc())
-        finally:
-            if self._io:
-                self._io.close()
 
     def _run(self):
         '''
@@ -170,6 +198,7 @@ class WorkerProcess(multiprocessing_context.Process):  # type: ignore[name-defin
         current_worker = self
 
         if multiprocessing_context.get_start_method() != 'fork':
+            context.CLIARGS = self._cliargs
             # Initialize plugin loader after parse, so that the init code can utilize parsed arguments
             cli_collections_path = context.CLIARGS.get('collections_path') or []
             if not is_sequence(cli_collections_path):

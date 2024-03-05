@@ -409,7 +409,7 @@ class StrategyBase:
                     # Pass WorkerProcess its strategy worker number so it can send an identifier along with intra-task requests
                     worker_prc = WorkerProcess(
                         self._final_q, task_vars, host, task, play_context, self._loader, self._variable_manager,
-                        plugin_loader.get_plugin_loader_namespace(), self._cur_worker,
+                        plugin_loader.get_plugin_loader_namespace(), self._cur_worker, context.CLIARGS,
                     )
                     self._workers[self._cur_worker] = worker_prc
                     self._tqm.send_callback('v2_runner_on_start', host, task)
