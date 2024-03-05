@@ -17,11 +17,8 @@
 
 from __future__ import annotations
 
-import contextlib
-import errno
-import fcntl
 import os
-import termios
+import sys
 import traceback
 from multiprocessing.queues import Queue
 
@@ -78,6 +75,9 @@ class WorkerProcess(multiprocessing_context.Process):  # type: ignore[name-defin
 
         self.worker_queue = WorkerQueue(ctx=multiprocessing_context)
         self.worker_id = worker_id
+        self._detached = False
+        self._detach_error = None
+        self._io = None
 
     def start(self):
         '''
@@ -90,23 +90,7 @@ class WorkerProcess(multiprocessing_context.Process):  # type: ignore[name-defin
 
         # FUTURE: this lock can be removed once a more generalized pre-fork thread pause is in place
         with display._lock:
-            if multiprocessing_context.get_start_method() == 'fork':
-                self._master, self._slave = os.openpty()
-                cm = contextlib.ExitStack()
-                cm.callback(os.close, self._slave)
-            else:
-                cm = contextlib.nullcontext()
-            with cm:
-                super(WorkerProcess, self).start()
-
-    def terminate(self):
-        if multiprocessing_context.get_start_method() == 'fork':
-            try:
-                os.close(self._master)
-            except OSError as e:
-                if e.errno != errno.EBADF:
-                    raise
-        super().terminate()
+            super(WorkerProcess, self).start()
 
     def _hard_exit(self, e):
         '''
@@ -132,23 +116,17 @@ class WorkerProcess(multiprocessing_context.Process):  # type: ignore[name-defin
         including /dev/tty. Children should use Display, instead of direct interactions
         with stdio fds.
         '''
-
-        if multiprocessing_context.get_start_method() != 'fork':
-            # If we aren't forking, we don't have inherited pty
-            _, self._slave = os.openpty()
-        else:
-            os.close(self._master)
-
         try:
-            os.login_tty(self._slave)
-        except AttributeError:
-            # deprecated: description='os.login_tty fallback' python_version='3.11'
             os.setsid()
-            fcntl.ioctl(self._slave, termios.TIOCSCTTY)
-            os.dup2(self._slave, 0)
-            os.dup2(self._slave, 1)
-            os.dup2(self._slave, 2)
-            os.close(self._slave)
+            self._io = open(os.devnull, 'w')  # type: ignore[misc]
+            sys.stdin = sys.__stdin__ = self._io  # type: ignore[misc]
+            sys.stdout = sys.__stdout__ = sys.stdin  # type: ignore[misc]
+            sys.stderr = sys.__stderr__ = sys.stdin  # type: ignore[misc]
+        except Exception as e:
+            # We aren't in a place we can reliably notify from, just pass here, evaluate self._detached later
+            self._detach_error = (e, traceback.format_exc())
+        else:
+            self._detached = True
 
     def run(self):
         '''
@@ -165,6 +143,9 @@ class WorkerProcess(multiprocessing_context.Process):  # type: ignore[name-defin
             return self._run()
         except BaseException:
             self._hard_exit(traceback.format_exc())
+        finally:
+            if self._io:
+                self._io.close()
 
     def _run(self):
         '''
@@ -179,6 +160,11 @@ class WorkerProcess(multiprocessing_context.Process):  # type: ignore[name-defin
 
         # Set the queue on Display so calls to Display.display are proxied over the queue
         display.set_queue(self._final_q)
+
+        if not self._detached:
+            display.debug(f'Could not detach from stdio: {self._detach_error[1]}')
+            display.error(f'Could not detach from stdio: {self._detach_error[0]}')
+            os._exit(1)
 
         global current_worker
         current_worker = self
