@@ -7,7 +7,6 @@ from __future__ import annotations
 import pytest
 import sys
 
-from io import StringIO
 from unittest.mock import MagicMock
 
 from ansible.playbook.play_context import PlayContext

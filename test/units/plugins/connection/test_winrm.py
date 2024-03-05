@@ -8,8 +8,6 @@ import os
 
 import pytest
 
-from io import StringIO
-
 from unittest.mock import MagicMock
 from ansible.errors import AnsibleConnectionFailure, AnsibleError
 from ansible.module_utils.common.text.converters import to_bytes
