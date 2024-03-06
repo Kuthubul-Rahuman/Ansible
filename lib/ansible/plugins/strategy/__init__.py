@@ -399,6 +399,8 @@ class StrategyBase:
 
                 worker_prc = self._workers[self._cur_worker]
                 if worker_prc is None or not worker_prc.is_alive():
+                    if worker_prc:
+                        worker_prc.close()
                     self._queued_task_cache[(host.name, task._uuid)] = {
                         'host': host,
                         'task': task,

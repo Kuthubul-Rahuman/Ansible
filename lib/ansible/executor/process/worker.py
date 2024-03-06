@@ -105,10 +105,10 @@ class WorkerProcess(multiprocessing_context.Process):  # type: ignore[name-defin
         with display._lock, cm:
             super(WorkerProcess, self).start()
 
-    def terminate(self):
+    def close(self):
         if self._master:
             os.close(self._master)
-        super().terminate()
+        super().close()
 
     def _hard_exit(self, e):
         '''
