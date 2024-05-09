@@ -325,7 +325,7 @@ class CronTab(object):
             os.unlink(path)
 
             if rc != 0:
-                self.module.fail_json(msg=err)
+                self.module.fail_json(msg=err, stdout=out, rc=rc)
 
         # set SELinux permissions
         if self.module.selinux_enabled() and self.cron_file:
