@@ -1218,13 +1218,8 @@ class DnfModule(YumDnf):
             failure_response['msg'] = "Depsolve Error occurred: {0}".format(to_native(e))
             self.module.fail_json(**failure_response)
         except dnf.exceptions.Error as e:
-            if to_text("already installed") in to_text(e):
-                response['changed'] = False
-                response['results'].append("Package already installed: {0}".format(to_native(e)))
-                self.module.exit_json(**response)
-            else:
-                failure_response['msg'] = "Unknown Error occurred: {0}".format(to_native(e))
-                self.module.fail_json(**failure_response)
+            failure_response['msg'] = "Unknown Error occurred: {0}".format(to_native(e))
+            self.module.fail_json(**failure_response)
 
     def run(self):
         """The main function."""
