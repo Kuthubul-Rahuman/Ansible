@@ -422,35 +422,6 @@ class DnfModule(YumDnf):
         except AttributeError:
             self.with_modules = False
 
-    def _sanitize_dnf_error_msg_install(self, spec, error):
-        """
-        For unhandled dnf.exceptions.Error scenarios, there are certain error
-        messages we want to filter in an install scenario. Do that here.
-        """
-        if (
-            to_text("no package matched") in to_text(error) or
-            to_text("No match for argument:") in to_text(error)
-        ):
-            return "No package {0} available.".format(spec)
-
-        return error
-
-    def _sanitize_dnf_error_msg_remove(self, spec, error):
-        """
-        For unhandled dnf.exceptions.Error scenarios, there are certain error
-        messages we want to ignore in a removal scenario as known benign
-        failures. Do that here.
-        """
-        if (
-            'no package matched' in to_native(error) or
-            'No match for argument:' in to_native(error)
-        ):
-            return (False, "{0} is not installed".format(spec))
-
-        # Return value is tuple of:
-        #   ("Is this actually a failure?", "Error Message")
-        return (True, error)
-
     def _package_dict(self, package):
         """Return a dictionary of information for the package."""
         # NOTE: This no longer contains the 'dnfstate' field because it is
@@ -786,8 +757,8 @@ class DnfModule(YumDnf):
             if self.base.conf.strict:
                 return {
                     'failed': True,
-                    'msg': msg,
-                    'failure': " ".join((pkg_spec, to_native(e))),
+                    'msg': '',
+                    'failure': msg,
                     'rc': 1,
                     "results": []
                 }
@@ -800,16 +771,13 @@ class DnfModule(YumDnf):
                 "results": []
             }
         except dnf.exceptions.Error as e:
-            if to_text("already installed") in to_text(e):
-                return {'failed': False, 'msg': '', 'failure': ''}
-            else:
-                return {
-                    'failed': True,
-                    'msg': "Unknown Error occurred for package {0}.".format(pkg_spec),
-                    'failure': " ".join((pkg_spec, to_native(e))),
-                    'rc': 1,
-                    "results": []
-                }
+            return {
+                'failed': True,
+                'msg': "Unknown Error occurred for package {0}.".format(pkg_spec),
+                'failure': " ".join((pkg_spec, to_native(e))),
+                'rc': 1,
+                "results": []
+            }
 
         return {'failed': False, 'msg': msg, 'failure': '', 'rc': 0}
 
@@ -1033,7 +1001,7 @@ class DnfModule(YumDnf):
                         if install_result['failed']:
                             if install_result['msg']:
                                 failure_response['msg'] += install_result['msg']
-                            failure_response['failures'].append(self._sanitize_dnf_error_msg_install(pkg_spec, install_result['failure']))
+                            failure_response['failures'].append(install_result['failure'])
                         else:
                             if install_result['msg']:
                                 response['results'].append(install_result['msg'])
@@ -1092,7 +1060,7 @@ class DnfModule(YumDnf):
                         if install_result['failed']:
                             if install_result['msg']:
                                 failure_response['msg'] += install_result['msg']
-                            failure_response['failures'].append(self._sanitize_dnf_error_msg_install(pkg_spec, install_result['failure']))
+                            failure_response['failures'].append(install_result['failure'])
                         else:
                             if install_result['msg']:
                                 response['results'].append(install_result['msg'])
@@ -1139,18 +1107,13 @@ class DnfModule(YumDnf):
                         # Environment is already uninstalled.
                         pass
 
-                installed = self.base.sack.query().installed()
                 for pkg_spec in pkg_specs:
                     # short-circuit installed check for wildcard matching
                     if '*' in pkg_spec:
                         try:
                             self.base.remove(pkg_spec)
                         except dnf.exceptions.MarkingError as e:
-                            is_failure, handled_remove_error = self._sanitize_dnf_error_msg_remove(pkg_spec, to_native(e))
-                            if is_failure:
-                                failure_response['failures'].append('{0} - {1}'.format(pkg_spec, to_native(e)))
-                            else:
-                                response['results'].append(handled_remove_error)
+                            response['results'].append(str(e))
                         continue
 
                     installed_pkg = dnf.subject.Subject(pkg_spec).get_best_query(
