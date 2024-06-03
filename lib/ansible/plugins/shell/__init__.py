@@ -207,20 +207,21 @@ class ShellBase(AnsiblePlugin):
         return 'echo %spwd%s' % (self._SHELL_SUB_LEFT, self._SHELL_SUB_RIGHT)
 
     def build_module_command(self, env_string, shebang, cmd, arg_path=None):
-        # don't quote the cmd if it's an empty string, because this will break pipelining mode
-        if cmd.strip() != '':
-            cmd = shlex.quote(cmd)
-
         cmd_parts = []
-        if shebang:
-            shebang = shebang.replace("#!", "").strip()
-        else:
-            shebang = ""
-        cmd_parts.extend([env_string.strip(), shebang, cmd])
+        env_string = env_string.strip()
+        if env_string:
+            env_string += " "
+
+        if shebang := shebang.replace("#!", "").strip():
+            cmd_parts.append(shebang)
+
+        if cmd := cmd.strip():
+            cmd_parts.append(cmd)
+
         if arg_path is not None:
             cmd_parts.append(arg_path)
-        new_cmd = " ".join(cmd_parts)
-        return new_cmd
+
+        return f'{env_string}%s' % shlex.join(cps for cp in cmd_parts if cp and (cps := cp.strip()))
 
     def append_command(self, cmd, cmd_to_append):
         """Append an additional command if supported by the shell"""
