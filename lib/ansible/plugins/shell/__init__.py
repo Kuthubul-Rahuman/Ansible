@@ -101,31 +101,23 @@ class ShellBase(AnsiblePlugin):
     def chmod(self, paths, mode):
         cmd = ['chmod', mode]
         cmd.extend(paths)
-        cmd = [shlex.quote(c) for c in cmd]
-
-        return ' '.join(cmd)
+        return shlex.join(cmd)
 
     def chown(self, paths, user):
         cmd = ['chown', user]
         cmd.extend(paths)
-        cmd = [shlex.quote(c) for c in cmd]
-
-        return ' '.join(cmd)
+        return shlex.join(cmd)
 
     def chgrp(self, paths, group):
         cmd = ['chgrp', group]
         cmd.extend(paths)
-        cmd = [shlex.quote(c) for c in cmd]
-
-        return ' '.join(cmd)
+        return shlex.join(cmd)
 
     def set_user_facl(self, paths, user, mode):
         """Only sets acls for users as that's really all we need"""
         cmd = ['setfacl', '-m', 'u:%s:%s' % (user, mode)]
         cmd.extend(paths)
-        cmd = [shlex.quote(c) for c in cmd]
-
-        return ' '.join(cmd)
+        return shlex.join(cmd)
 
     def remove(self, path, recurse=False):
         path = shlex.quote(path)
