@@ -3,7 +3,7 @@
   gather_facts: false
   tasks:
     - name: where is bash
-      command: command -v bash
+      shell: command -v bash
       register: bash
       changed_when: false
 
