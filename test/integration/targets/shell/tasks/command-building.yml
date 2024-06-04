@@ -1,8 +1,6 @@
 - vars:
-    output_dir: "{{ lookup('env', 'OUTPUT_DIR') }}"
-    delegate_to: localhost
-    atd: '{{ output_dir }}/shell/t m p'
-    api: '{{ output_dir }}/shell/p y t h o n'
+    atd: '{{ remote_tmp_dir }}/shell/t m p'
+    api: '{{ remote_tmp_dir }}/shell/p y t h o n'
   block:
     - name: create test dir
       file:
@@ -17,16 +15,21 @@
     - name: create symlink for ansible_python_interpreter to file with spaces
       file:
         dest: '{{ api }}'
-        src: '{{ ansible_playbook_python }}'
+        src: '{{ ansible_facts.python.executable }}'
         state: link
 
     - name: run simple test playbook
-      command: ansible-playbook -vvv -e 'ansible_python_interpreter="{{ api }}"' "{{ role_path }}/test-command-building-playbook.yml"
+      command: >-
+        ansible-playbook -vvv -i inventory
+        -e 'ansible_python_interpreter="{{ api }}"'
+        -e 'ansible_pipelining=0'
+        "{{ role_path }}/test-command-building-playbook.yml"
       environment:
         ANSIBLE_REMOTE_TMP: '{{ atd }}'
         ANSIBLE_NOCOLOR: "1"
         ANSIBLE_FORCE_COLOR: "0"
       register: command_building
+      delegate_to: localhost
 
     - debug:
         var: command_building.stdout_lines
