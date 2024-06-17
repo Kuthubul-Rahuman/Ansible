@@ -799,9 +799,8 @@ class AIXTimezone(Timezone):
     def __get_timezone(self):
         """ Return the current value of TZ= in /etc/environment """
         try:
-            f = open('/etc/environment', 'r')
-            etcenvironment = f.read()
-            f.close()
+            with open('/etc/environment', 'r') as f:
+                etcenvironment = f.read()
         except Exception:
             self.module.fail_json(msg='Issue reading contents of /etc/environment')
 
