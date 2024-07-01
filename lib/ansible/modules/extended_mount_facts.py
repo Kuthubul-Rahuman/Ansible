@@ -7,7 +7,7 @@ from __future__ import annotations
 
 DOCUMENTATION = """
 ---
-module: remote_mount_facts
+module: extended_mount_facts
 version_added: 2.18
 short_description: Get mount facts for devices that do not start with a path separator.
 description:
@@ -32,7 +32,7 @@ options:
     description: The maximum number of seconds to query for each mount type in O(collect).
     default: 20
     type: int
-  timeout_handler:
+  timeout:
     description:
       - The action to take when a timeout occurs.
       - When this is set to V(warn) or V(ignore), mounts that time out will be excluded from the results.
@@ -57,7 +57,7 @@ author:
 
 EXAMPLES = """
 - name: Get NFS and FUSE subtype mounts
-  remote_mount_facts:
+  extended_mount_facts:
     collect:
       - nfs
       - fuse
@@ -65,11 +65,11 @@ EXAMPLES = """
 
 RETURN = """
 ansible_facts:
-    description: An ansible_facts dictionary containing C(remote_mounts).
+    description: An ansible_facts dictionary containing C(extended_mounts).
     returned: always
     type: dict
     sample:
-      remote_mounts:
+      extended_mounts:
         /mnt/mount:
           info:
             block_available: 3242510
@@ -137,7 +137,7 @@ def get_mount_info(
     Attempts to get the mount size and UUID within the specified timeout.
     """
     seconds = module.params["timeout"]
-    on_error = module.params["timeout_handler"]
+    on_error = module.params["on_timeout"]
 
     @timeout.timeout(seconds)
     def _get_mount_info(mount, device, uuids, udevadm_uuid):
@@ -254,7 +254,7 @@ def main():
         argument_spec=dict(
             collect=dict(type="list", elements="str", required=True, choices=TYPES),
             timeout=dict(type="int", default=20),
-            timeout_handler=dict(choices=["error", "warn", "ignore"], default="error"),
+            on_timeout=dict(choices=["error", "warn", "ignore"], default="error"),
         ),
         supports_check_mode=True,
     )
@@ -283,7 +283,7 @@ def main():
 
         results[mount] = {"info": fields, "uuid": uuid or "N/A"}
 
-    module.exit_json(ansible_facts={"remote_mounts": results})
+    module.exit_json(ansible_facts={"extended_mounts": results})
 
 
 if __name__ == "__main__":
