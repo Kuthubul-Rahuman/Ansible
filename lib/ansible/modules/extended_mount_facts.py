@@ -32,7 +32,7 @@ options:
     description: The maximum number of seconds to query for each mount type in O(collect).
     default: 0
     type: int
-  timeout:
+  on_timeout:
     description:
       - The action to take when a timeout occurs.
       - When this is set to V(warn) or V(ignore), mounts that time out will be excluded from the results.
@@ -94,7 +94,6 @@ from ansible.module_utils.facts.utils import get_mount_size, get_file_content
 
 from typing import Callable, Optional
 
-import os
 import re
 
 # Regular expressions to match individual lines from mount
