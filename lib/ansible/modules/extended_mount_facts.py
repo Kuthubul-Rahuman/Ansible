@@ -30,7 +30,7 @@ options:
       - zfs
   timeout:
     description: The maximum number of seconds to query for each mount type in O(collect).
-    default: 20
+    default: 0
     type: int
   timeout:
     description:
@@ -136,7 +136,7 @@ def get_mount_info(
     """
     Attempts to get the mount size and UUID within the specified timeout.
     """
-    seconds = module.params["timeout"]
+    seconds = module.params["timeout"] or .01
     on_error = module.params["on_timeout"]
 
     @timeout.timeout(seconds)
@@ -253,7 +253,7 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             collect=dict(type="list", elements="str", required=True, choices=TYPES),
-            timeout=dict(type="int", default=20),
+            timeout=dict(type="int", default=0),
             on_timeout=dict(choices=["error", "warn", "ignore"], default="error"),
         ),
         supports_check_mode=True,
