@@ -192,7 +192,7 @@ def parse_mount_output(module: AnsibleModule) -> list[dict[str, str]]:
     mount_path = module.get_bin_path("mount")
     mount_output = ""
     if mount_path:
-        rc, mount_out, err = module.run_command(mount_path)
+        rc, mount_out, err = module.run_command(mount_path, check_rc=True)
 
     mounts = []
     for line in mount_out.splitlines():
