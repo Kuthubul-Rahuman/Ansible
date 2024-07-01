@@ -209,31 +209,18 @@ def list_current_mounts(module: AnsibleModule) -> list[dict[str, str]]:
       * /etc/mnttab (Solaris)
     If no information if found in the files, attempts to parse the output from mount.
     """
-
-    mnttab = False
-    mtab_entries = ""
-    if os.path.exists("/etc/mtab"):
-        mtab_entries = get_file_content("/etc/mtab", "")
-    if not mtab_entries and os.path.exists("/proc/mounts"):
-        # device mount fstype options dump passno
-        mtab_entries = get_file_content("/proc/mounts", "")
-    elif os.path.exists("/etc/mnttab"):
-        # device mount fstype options time
-        mtab_entries = get_file_content("/etc/mnttab", "")
-        mnttab = True
-
     mounts = []
-    for mtab_entry in mtab_entries.splitlines():
+
+    # device mount fstype options dump passno
+    mtab_entries = get_file_content("/etc/mtab", "") or get_file_content("/proc/mounts", "")
+
+    # device mount fstype options time
+    mnttab = get_file_content("/etc/mnttab", "")
+
+    for mtab_entry in (mtab_entries or mnttab).splitlines():
         fields = mtab_entry.split(" ")
         if len(fields) < 4:
             continue
-
-        extra = {}
-        if mnttab and len(fields) >= 5:
-            extra["time"] = fields[4]
-        elif not mnttab and len(fields) >= 6:
-            extra["dump"] = fields[4]
-            extra["passno"] = fields[5]
 
         mount_info = {
             "mount": fields[1],
@@ -241,7 +228,13 @@ def list_current_mounts(module: AnsibleModule) -> list[dict[str, str]]:
             "fstype": fields[2],
             "options": fields[3],
         }
-        mount_info.update(extra)
+
+        if mtab_entries:
+            if len(fields) >= 6:
+                mount_info.update({"dump": fields[4], "passno": fields[5]})
+        elif len(fields) >= 5:
+            mount_info.update({"time": fields[4]})
+
         mounts.append(mount_info)
 
     if not mounts:
