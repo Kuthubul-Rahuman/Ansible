@@ -29,7 +29,7 @@ options:
       - vboxsf
       - zfs
   timeout:
-    description: The maximum number of seconds to query for each mount type in O(collect).
+    description: The maximum number of seconds to query for each mount.
     default: 0
     type: int
   on_timeout:
