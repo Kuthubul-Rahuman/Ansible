@@ -94,7 +94,7 @@ from ansible.module_utils.facts.hardware.linux import LinuxHardware
 from ansible.module_utils.facts.utils import get_mount_size, get_file_content
 
 from fnmatch import fnmatch
-from typing import Callable, Optional
+from typing import Callable
 from sys import platform
 
 import re
@@ -122,7 +122,7 @@ def get_mount_info(
     device: str,
     uuids: dict[str, str],
     udevadm_uuid: Callable[[str], str]
-) -> tuple[Optional[dict], Optional[str]]:
+) -> tuple[dict | None, str | None]:
     """
     Attempts to get the mount size and UUID within an optional timeout.
     """
@@ -147,7 +147,7 @@ def get_mount_info(
     return None, None
 
 
-def parse_mount(line: str) -> Optional[dict[str, str]]:
+def parse_mount(line: str) -> dict[str, str] | None:
     """
     Parse a line of mount information and return a dictionary with mount details.
     """
