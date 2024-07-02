@@ -185,24 +185,25 @@ def parse_mount_output(module: AnsibleModule) -> list[dict[str, str]]:
     """
     Parse output from the mount command.
     """
-    mount_path = module.get_bin_path("mount")
+    if not (mount_path := module.get_bin_path("mount")):
+        return []
+
     mount_output = ""
-    if mount_path:
-        if platform.startswith("dragonfly"):
-            args = [mount_path, "-p"]
-        else:
-            args = [mount_path]
-        try:
-            result = subprocess.run(*args, capture_output=True, text=True, check=True, timeout=module.params["timeout"])
-            mount_output = result.stdout
-        except subprocess.TimeoutExpired as e:
-            if module.params["on_timeout"] == "error":
-                module.fail_json(msg="Running the mount command timed out, unable to retrieve mount facts.")
-            elif module.params["on_timeout"] == "warn":
-                module.warn("Running the mount command timed out, unable to retrieve mount facts.")
-            return []
-        except subprocess.CalledProcessError as e:
-            module.fail_json(msg=f"An error occurred while running the mount command: {str(e)}")
+    if platform.startswith("dragonfly"):
+        args = [mount_path, "-p"]
+    else:
+        args = [mount_path]
+    try:
+        result = subprocess.run(*args, capture_output=True, text=True, check=True, timeout=module.params["timeout"])
+        mount_output = result.stdout
+    except subprocess.TimeoutExpired as e:
+        if module.params["on_timeout"] == "error":
+            module.fail_json(msg="Running the mount command timed out, unable to retrieve mount facts.")
+        elif module.params["on_timeout"] == "warn":
+            module.warn("Running the mount command timed out, unable to retrieve mount facts.")
+        mount_output = ""
+    except subprocess.CalledProcessError as e:
+        module.fail_json(msg=f"An error occurred while running the mount command: {str(e)}")
 
     mounts = []
     for line in mount_output.splitlines():
