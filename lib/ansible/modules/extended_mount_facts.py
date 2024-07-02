@@ -193,7 +193,8 @@ def parse_mount_output(module: AnsibleModule) -> list[dict[str, str]]:
         else:
             args = [mount_path]
         try:
-            mount_output = subprocess.run(*args, capture_output=True, text=True, check=True, timeout=module.params["timeout"])
+            result = subprocess.run(*args, capture_output=True, text=True, check=True, timeout=module.params["timeout"])
+            mount_output = result.stdout
         except subprocess.TimeoutExpired as e:
             if module.params["on_timeout"] == "error":
                 module.fail_json(msg="Running the mount command timed out, unable to retrieve mount facts.")
