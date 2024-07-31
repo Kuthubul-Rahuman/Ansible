@@ -29,6 +29,7 @@ from unittest.mock import patch
 
 from ansible import errors
 from ansible.parsing import vault
+from ansible.parsing.vault.ciphers import aes256
 from ansible.parsing.vault import VaultLib, VaultEditor, match_encrypt_secret
 
 from ansible.module_utils.common.text.converters import to_bytes, to_text
@@ -43,7 +44,7 @@ v11_data = """$ANSIBLE_VAULT;1.1;AES256
 3739"""
 
 
-@pytest.mark.skipif(not vault.HAS_CRYPTOGRAPHY,
+@pytest.mark.skipif(not aes256.HAS_CRYPTOGRAPHY,
                     reason="Skipping cryptography tests because cryptography is not installed")
 class TestVaultEditor(unittest.TestCase):
 
@@ -59,9 +60,6 @@ class TestVaultEditor(unittest.TestCase):
         return match_encrypt_secret(self.vault_secrets)[1]
 
     def tearDown(self):
-        if self._test_dir:
-            pass
-            # shutil.rmtree(self._test_dir)
         self._test_dir = None
 
     def _secrets(self, password):

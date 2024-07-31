@@ -4,9 +4,11 @@
 
 from __future__ import annotations
 
-import sys
-
 import pytest
+import random
+import string
+import sys
+import unittest
 
 from ansible import constants as C
 from ansible.cli.arguments import option_helpers as opt_help
@@ -32,3 +34,39 @@ VERSION_OUTPUT = opt_help.version(prog=FAKE_PROG)
 )
 def test_option_helper_version(must_have):
     assert must_have in VERSION_OUTPUT
+
+
+class TestHelperFunctions(unittest.TestCase):
+
+    def setUp(self):
+
+        self.good_strings = ['no bad chars', '-', 'らとみ', 'café']
+        source = string.ascii_lowercase + string.ascii_uppercase + string.digits + string.punctuation
+        while len(self.good_strings) < 10:
+            rand = ''.join(random.choices(source, k=random.randrange(1,32)))
+            if 'F' in rand or ';' in rand:
+               continue  # we only want 'GOOD' strings
+            self.good_strings.append(rand)
+
+        self.bad_strings = [True, 'I have F', 'i ;', 'both ; and F', None, 'らとみ with F', ';café;']
+
+    def test_str_sans_forbidden_characters_detection(self):
+
+        @opt_help.str_sans_forbidden_characters('F', ';')
+        def iusestring(string):
+            return string
+
+        for good in self.good_strings:
+            self.assertEqual(iusestring(good), good)
+
+        for bad in self.bad_strings:
+            self.assertRaises(ValueError, iusestring(bad))
+
+    def test_str_sans_forbidden_characters_input(self):
+
+        @opt_help.str_sans_forbidden_characters(None)
+        def iusestring(string):
+            return string
+
+        for anystring in self.good_strings + self.bad_strings:
+            self.assertRaises(TypeError, iusestring(anystring))
