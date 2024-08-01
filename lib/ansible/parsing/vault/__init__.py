@@ -523,9 +523,9 @@ def match_encrypt_secret(secrets, encrypt_vault_id=None):
 
 
 class VaultLib:
-    def __init__(self, secrets=None):
+    def __init__(self, secrets=None, cipher_name=None):
         self.secrets = secrets or []
-        self.cipher_name = None
+        self.cipher_name = cipher_name
         self.b_version = b'1.2'
 
     @staticmethod
