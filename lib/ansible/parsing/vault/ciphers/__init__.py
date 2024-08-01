@@ -14,7 +14,7 @@ class VaultCipher:
     """
         Base class all ciphers must implement
     """
-    defaults = {}
+    defaults: Dict[str, str | int] = {}
 
     @abstractmethod
     def encrypt(self, b_plaintext, secret, salt=None, options=None):
