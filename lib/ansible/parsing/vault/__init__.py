@@ -29,6 +29,13 @@ import tempfile
 
 from importlib import import_module
 
+HAS_CRYPTOGRAPHY = False
+try:
+    from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+    HAS_CRYPTOGRAPHY = True
+except ImportError:
+    pass
+
 from ansible.errors import AnsibleError, AnsibleAssertionError, AnsibleVaultError, AnsibleVaultFormatError, AnsibleVaultPasswordError
 from ansible import constants as C
 from ansible.module_utils.common.text.converters import to_bytes, to_text, to_native
@@ -213,8 +220,10 @@ class VaultSecret:
     '''Opaque/abstract objects for a single vault secret. ie, a password or a key.'''
 
     def __init__(self, _bytes=None):
-        # FIXME: ? that seems wrong... Unset etc?
-        self._bytes = _bytes
+        # FIXME: figure out why we would allow empty secrets
+        self._bytes = to_bytes(_bytes, errors='strict')
+        self._derived = None
+        self.salt = os.urandom(32)
 
     @property
     def bytes(self):
@@ -222,10 +231,29 @@ class VaultSecret:
 
         Sub classes that store text types will need to override to encode the text to bytes.
         '''
+        self._derive_keys()
         return self._bytes
 
     def load(self):
+        self._derive_keys()
         return self._bytes
+
+    def _derive_keys(self):
+        """ create derived version of the secret and cache for improving encryption performance """
+        if self._derived is None and HAS_CRYPTOGRAPHY and self._bytes:
+            kdf = Scrypt(
+                    block_size=8,
+                    cost=2**14,
+                    length=32,
+                    parallel=1,
+                    salt=self.salt,
+                )
+            self._derived = kdf.derive(self._bytes)
+
+    @property
+    def derived(self):
+        self._derive_keys()
+        return self.salt, self._derived
 
 
 class PromptVaultSecret(VaultSecret):
@@ -240,12 +268,9 @@ class PromptVaultSecret(VaultSecret):
         else:
             self.prompt_formats = prompt_formats
 
-    @property
-    def bytes(self):
-        return self._bytes
-
     def load(self):
         self._bytes = self.ask_vault_passwords()
+        super(PromptVaultSecret, self).load()
 
     def ask_vault_passwords(self):
         b_vault_passwords = []
@@ -337,6 +362,7 @@ class FileVaultSecret(VaultSecret):
 
     @property
     def bytes(self):
+        self._derive_keys()
         if self._bytes:
             return self._bytes
         if self._text:
@@ -345,6 +371,7 @@ class FileVaultSecret(VaultSecret):
 
     def load(self):
         self._bytes = self._read_file(self.filename)
+        super(FileVaultSecret, self).load()
 
     def _read_file(self, filename):
         """
