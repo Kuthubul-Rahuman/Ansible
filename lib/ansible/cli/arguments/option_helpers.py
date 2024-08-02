@@ -122,10 +122,10 @@ def maybe_unfrack_path(beacon):
 def str_sans_forbidden_characters(*nope):
     ''' ensure option is a string and does not have any characters from forbidden list'''
 
-    if not is_sequence(nope):
-        raise TypeError(f"Expected list but got {type(nope)}")
-
     def inner(value):
+        if not is_sequence(nope):
+            raise TypeError(f"Expected list but got {type(nope)}")
+
         if not isinstance(value, string_types):
             raise ValueError(f"Expected a string but got a {type(value)}")
 
