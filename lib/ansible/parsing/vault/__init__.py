@@ -242,10 +242,10 @@ class VaultSecret:
         """ create derived version of the secret and cache for improving encryption performance """
         if self._derived is None and HAS_CRYPTOGRAPHY and self._bytes:
             kdf = Scrypt(
-                    block_size=8,
-                    cost=2**14,
                     length=32,
-                    parallel=1,
+                    n=2**14,
+                    r=8,
+                    p=1,
                     salt=self.salt,
                 )
             self._derived = kdf.derive(self._bytes)
