@@ -21,16 +21,18 @@ class VaultROT13(VaultCipher):
     def _rot13(string):
         lower = "abcdefghijklmnopqrstuvwxyz"
         rotten = lower[13:] + lower[:13]
-        rot = lambda c: rotten[lower.find(c)] if lower.find(c)>-1 else c
+
+        def _rot(c):
+            return rotten[lower.find(c)] if lower.find(c)>-1 else c
 
         cipher = []
         for char in string:
             low = char.islower()
-            x = rot(char.lower())
-            if low:
-                cipher.append(x)
-            else:
-                cipher.append(x.upper())
+            x = _rot(char.lower())
+            if not low:
+                x = x.upper()
+            cipher.append(x)
+
         return ''.join(cipher)
 
     def encrypt(self, b_plaintext, secret, salt=None, options=None):
@@ -41,7 +43,7 @@ class VaultROT13(VaultCipher):
         if salt is not None:
             display.warning("You passed a salt? ... LOL")
 
-        return base64.b64encode(to_bytes(self._rot13(to_text(b_plaintext))))
+        return base64.b64encode(to_bytes(self._rot13(to_text(b_plaintext, errors='surrogate_or_strict'))))
 
 
     def decrypt(self, b_vaulttext, secret):
