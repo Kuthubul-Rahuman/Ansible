@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import base64
 
+from dataclasses import dataclass
+
 try:
     from cryptography.fernet import Fernet, InvalidToken
     from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
@@ -19,34 +21,49 @@ display = Display()
 
 PASS = {}
 
+
+# slots and kw_only are 3.10 only, nice to use going forward
+@dataclass(frozen=True)
+class Defaults():
+    salt: bytes = b'ansible'
+    length: int = 32
+    n: int = 2**14
+    r: int = 8
+    p: int = 1
+    key: bytes = None
+
+
 class VaultFERNETKEY(VaultCipher):
     """
     very simple vault implementation relying on fernet
     """
 
     @classmethod
+    def set_defaults(cls, options):
+        return Defaults(**options)
+
+    @classmethod
     def _key_from_password(cls, b_password, options=None):
 
         global PASS
-        if b_password not in PASS.keys():
-            if options is None:
-                # FIXME: use defaults
-                options = dict(salt=b'ansible', length=32, n=2**14, r=8, p=1)
+        if b_password not in PASS:
+            PASS[b_password] = {}
 
-            # derive
-            kdf = Scrypt(
-                         salt=to_bytes(options['salt']),
-                         length=options['length'],
-                         n=options['n'],
-                         r=options['r'],
-                         p=options['p'],
-                        )
+        if options is None:
+            options = {}
+
+        o = cls.set_defaults(options)
+
+        if o.salt not in PASS[b_password]:
+            # derive as not in cache
+
+            kdf = Scrypt(salt=o.salt, length=o.length, n=o.n, r=o.r, p=o.p)
             try:
-                PASS[b_password] = base64.urlsafe_b64encode(kdf.derive(b_password))
+                PASS[b_password][o.salt] = base64.urlsafe_b64encode(kdf.derive(b_password))
             except InvalidToken as e:
                 raise ValueError("Failed to derive key") from e
 
-        return PASS[b_password], options
+        return PASS[b_password][o.salt], options
 
     @classmethod
     def encrypt(cls, b_plaintext, secret, options=None):
@@ -66,7 +83,10 @@ class VaultFERNETKEY(VaultCipher):
         # now crypt random key with vault secret
         password_key, options = cls._key_from_password(b_password, options)
         p = Fernet(password_key)
+
+        # put random key (encrypted with vault secret) in options to store in ciphered text
         options['key'] = p.encrypt(key)
+
         try:
             return base64.b64encode(b';'.join([ciphered, cls.encode_options(options)]))
         except InvalidToken as e:
@@ -74,9 +94,13 @@ class VaultFERNETKEY(VaultCipher):
 
     @classmethod
     def decrypt(cls, b_vaulttext, secret):
+
         b_msg, b_options = base64.b64decode(b_vaulttext).split(b';', 2)
 
         options = cls.decode_options(b_options)
+        if 'salt' in options and not isinstance(options['salt'], bytes):
+            options['salt'] = to_bytes(options['salt'])
+
         password_key, options = cls._key_from_password(secret.bytes, options)
 
         p = Fernet(password_key)

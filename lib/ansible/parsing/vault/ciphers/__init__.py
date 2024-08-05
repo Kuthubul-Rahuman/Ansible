@@ -13,8 +13,10 @@ from ansible.module_utils.common.text.converters import to_bytes, to_text
 class VaultCipher:
     """
         Base class all ciphers must implement
+
+        We don't mind duplication in the cipher classes, so limiting this to
+        encrypt/decrypt as we want ciphers to be as self contained as possible
     """
-    defaults: dict[str, str | int] = {}
 
     @classmethod
     @abstractmethod
@@ -48,8 +50,7 @@ class VaultCipher:
         pass
 
 
-    # FIXME: move all methods under this line to each cipher once polished
-
+    # FIXME/TODO before finalizing: move all methods under this line to each cipher once polished
     @staticmethod
     def encode_options(options):
         for k in options.keys():
@@ -59,7 +60,6 @@ class VaultCipher:
 
     @staticmethod
     def decode_options(b_options):
-        # TODO: do per value b64encoding
         return json.loads(to_text(b_options, errors='surrogate_or_strict'))
 
     @classmethod

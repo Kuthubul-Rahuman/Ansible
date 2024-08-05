@@ -192,7 +192,7 @@ def load_vault_cipher(cipher_name):
     if cipher_class is None:
         raise AnsibleVaultError(f"Could not locate cipher class matching provided name '{cipher_name}'")
 
-    if not VaultCipher in cipher_class.__bases__:
+    if VaultCipher not in cipher_class.__bases__:
         raise AnsibleVaultError(f"Invalid vault cipher class loaded, expecte a VaultCipher but got: {type(cipher_class)}")
 
     return cipher_class
@@ -214,7 +214,7 @@ class VaultSecret:
     '''Opaque/abstract objects for a single vault secret. ie, a password or a key.'''
 
     def __init__(self, _bytes=None):
-        # FIXME: figure out why we would allow empty secrets
+        # Future: figure out why we would allow empty secrets
         self._bytes = to_bytes(_bytes, errors='strict')
 
     @property
