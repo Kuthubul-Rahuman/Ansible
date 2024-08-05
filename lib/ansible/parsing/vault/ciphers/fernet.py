@@ -6,15 +6,12 @@ from __future__ import annotations
 import base64
 import os
 
-HAS_CRYPTOGRAPHY = False
 try:
     from cryptography.fernet import Fernet, InvalidToken
     from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
-    HAS_CRYPTOGRAPHY = True
-except ImportError:
-    pass
+except ImportError as e:
+    raise ImportError("The FERNET cipher for ansible-vault requires the cryptography library in order to function") from e
 
-from ansible.errors import AnsibleVaultError
 from ansible.parsing.vault.ciphers import VaultCipher
 from ansible.utils.display import Display
 
@@ -35,21 +32,13 @@ class VaultFERNET(VaultCipher):
                          # possibly not parallel depending on implementation
             )
 
-    @staticmethod
-    def _require_crypto(f):
-        def inner(self, *args, **kwargs):
-            if HAS_CRYPTOGRAPHY:
-                return f(self, *args, **kwargs)
-            else:
-                raise AnsibleVaultError("The FERNET cipher for ansible-vault requires the cryptography library in order to function")
-        return inner
-
-    def _key_from_password(self, b_password, salt=None, options=None):
+    @classmethod
+    def _key_from_password(cls, b_password, salt=None, options=None):
 
         if salt is None:
             salt = os.urandom(32)
 
-        options = self.set_defaults(options)
+        options = cls.set_defaults(options)
 
         # derive
         kdf = Scrypt(
@@ -62,30 +51,30 @@ class VaultFERNET(VaultCipher):
         try:
             return base64.urlsafe_b64encode(kdf.derive(b_password)), salt, options
         except InvalidToken as e:
-            raise AnsibleVaultError("Failed to derive key", orig_exc=e)
+            raise ValueError("Failed to derive key") from e
 
-    @_require_crypto
-    def encrypt(self, b_plaintext, secret, options=None):
+    @classmethod
+    def encrypt(cls, b_plaintext, secret, options=None):
 
         if secret is None:
-            raise AnsibleVaultError('The secret passed to encrypt() was None')
+            raise ValueError('The secret passed to encrypt() was None')
 
         b_password = secret.bytes
         if len(b_password) < 10:
-            raise AnsibleVaultError('The fernet cipher requires secrets longer than 10 bytes')
+            raise ValueError('The fernet cipher requires secrets longer than 10 bytes')
 
-        key, salt, options = self._key_from_password(b_password, options)
+        key, salt, options = cls._key_from_password(b_password, options)
         f = Fernet(key)
         try:
-            return base64.b64encode(b';'.join([salt, f.encrypt(b_plaintext), self.encode_options(options)]))
+            return base64.b64encode(b';'.join([salt, f.encrypt(b_plaintext), cls.encode_options(options)]))
         except InvalidToken as e:
-            raise AnsibleVaultError("Failed to encrypt", orig_exc=e)
+            raise ValueError("Failed to encrypt") from e
 
-    @_require_crypto
-    def decrypt(self, b_vaulttext, secret):
+    @classmethod
+    def decrypt(cls, b_vaulttext, secret):
         salt, b_msg, b_options = base64.b64decode(b_vaulttext).split(b';', 2)
-        f = Fernet(self._key_from_password(secret.bytes, salt, self.decode_options(b_options))[0])
+        f = Fernet(cls._key_from_password(secret.bytes, salt, cls.decode_options(b_options))[0])
         try:
             return f.decrypt(b_msg)
         except InvalidToken as e:
-            raise AnsibleVaultError("Failed to decrypt", orig_exc=e)
+            raise ValueError("Failed to decrypt") from e

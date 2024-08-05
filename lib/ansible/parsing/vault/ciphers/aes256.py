@@ -10,7 +10,6 @@ from binascii import hexlify
 from binascii import unhexlify
 from binascii import Error as BinasciiError
 
-HAS_CRYPTOGRAPHY = False
 CRYPTOGRAPHY_BACKEND = None
 try:
     with warnings.catch_warnings():
@@ -24,11 +23,9 @@ try:
         Cipher as C_Cipher, algorithms, modes
     )
     CRYPTOGRAPHY_BACKEND = default_backend()
-    HAS_CRYPTOGRAPHY = True
-except ImportError:
-    pass
+except ImportError as e:
+    raise ImportError("The AES256 cipher for ansible-vault requires the cryptography library in order to function") from e
 
-from ansible.errors import AnsibleVaultError
 from ansible import constants as C
 from ansible.module_utils.common.text.converters import to_bytes
 from ansible.utils.display import Display
@@ -47,27 +44,12 @@ class VaultAES256(VaultCipher):
 
     """
 
-    NEED_CRYPTO_LIBRARY = "The AES256 cipher for ansible-vault requires the cryptography library in order to function"
-
-    def __init__(self):
-        if not HAS_CRYPTOGRAPHY:
-            raise AnsibleVaultError(self.NEED_CRYPTO_LIBRARY)
-
     @staticmethod
     def _unhexlify(b_data):
         try:
             return unhexlify(b_data)
         except (BinasciiError, TypeError) as exc:
-            raise AnsibleVaultError('Invalid vaulted text format, cannot unhexlify: %s' % exc)
-
-    @staticmethod
-    def _require_crypto(f):
-        def inner(self, *args, **kwargs):
-            if HAS_CRYPTOGRAPHY:
-                return f(self, *args, **kwargs)
-            else:
-                raise AnsibleVaultError(self.NEED_CRYPTO_LIBRARY)
-        return inner
+            raise TypeError('Invalid vaulted text format, cannot unhexlify') from exc
 
     @staticmethod
     def _create_key_cryptography(b_password, b_salt, key_length, iv_length):
@@ -81,14 +63,15 @@ class VaultAES256(VaultCipher):
 
         return b_derivedkey
 
-    def _gen_key_initctr(self, b_password, b_salt):
+    @classmethod
+    def _gen_key_initctr(cls, b_password, b_salt):
         # 16 for AES 128, 32 for AES256
         key_length = 32
 
         # AES is a 128-bit block cipher, so IVs and counter nonces are 16 bytes
         iv_length = algorithms.AES.block_size // 8
 
-        b_derivedkey = self._create_key_cryptography(b_password, b_salt, key_length, iv_length)
+        b_derivedkey = cls._create_key_cryptography(b_password, b_salt, key_length, iv_length)
         b_iv = b_derivedkey[(key_length * 2):(key_length * 2) + iv_length]
 
         b_key1 = b_derivedkey[:key_length]
@@ -113,23 +96,23 @@ class VaultAES256(VaultCipher):
 
     @staticmethod
     def _get_salt():
-        # won't deprecate, this is unsafe, but cipher itself will be deprecated
+        # this is not safe, but won't deprecate as cipher itself will be deprecated
         custom_salt = C.config.get_config_value('VAULT_ENCRYPT_SALT')
         if not custom_salt:
             custom_salt = os.urandom(32)
         return to_bytes(custom_salt)
 
-    @_require_crypto
-    def encrypt(self, b_plaintext, secret, options=None):
+    @classmethod
+    def encrypt(cls, b_plaintext, secret, options=None):
 
         if secret is None:
-            raise AnsibleVaultError('The secret passed to encrypt() was None')
+            raise ValueError('The secret passed to encrypt() was None')
 
-        b_salt = self._get_salt()
+        b_salt = cls._get_salt()
         b_password = secret.bytes
-        b_key1, b_key2, b_iv = self._gen_key_initctr(b_password, b_salt)
+        b_key1, b_key2, b_iv = cls._gen_key_initctr(b_password, b_salt)
 
-        b_hmac, b_ciphertext = self._encrypt_cryptography(b_plaintext, b_key1, b_key2, b_iv)
+        b_hmac, b_ciphertext = cls._encrypt_cryptography(b_plaintext, b_key1, b_key2, b_iv)
 
         b_vaulttext = b'\n'.join([hexlify(b_salt), b_hmac, b_ciphertext])
         # Unnecessary x2 hexlifying but getting rid of it is a backwards incompatible change
@@ -143,7 +126,7 @@ class VaultAES256(VaultCipher):
         try:
             hmac.verify(b_crypted_hmac)
         except InvalidSignature as e:
-            raise AnsibleVaultError('HMAC verification failed: %s' % e)
+            raise ValueError('HMAC verification failed') from e
 
         cipher = C_Cipher(algorithms.AES(b_key1), modes.CTR(b_iv), CRYPTOGRAPHY_BACKEND)
         decryptor = cipher.decryptor()
@@ -154,16 +137,16 @@ class VaultAES256(VaultCipher):
 
         return b_plaintext
 
-    @_require_crypto
-    def decrypt(self, b_vaulttext, secret):
+    @classmethod
+    def decrypt(cls, b_vaulttext, secret):
         try:
-            b_salt, b_crypted_hmac, b_ciphertext = [self._unhexlify(x) for x in self._unhexlify(b_vaulttext).split(b"\n", 2)]
+            b_salt, b_crypted_hmac, b_ciphertext = [cls._unhexlify(x) for x in cls._unhexlify(b_vaulttext).split(b"\n", 2)]
         except ValueError as e:
-            raise AnsibleVaultError("Invalid ciphered data in vault", orig_exc=e)
+            raise ValueError("Invalid ciphered data in vault") from e
 
         b_password = secret.bytes
-        b_key1, b_key2, b_iv = self._gen_key_initctr(b_password, b_salt)
+        b_key1, b_key2, b_iv = cls._gen_key_initctr(b_password, b_salt)
 
-        b_plaintext = self._decrypt_cryptography(b_ciphertext, b_crypted_hmac, b_key1, b_key2, b_iv)
+        b_plaintext = cls._decrypt_cryptography(b_ciphertext, b_crypted_hmac, b_key1, b_key2, b_iv)
 
         return b_plaintext

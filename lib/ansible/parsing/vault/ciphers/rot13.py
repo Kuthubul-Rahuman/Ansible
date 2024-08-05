@@ -35,18 +35,20 @@ class VaultROT13(VaultCipher):
 
         return ''.join(cipher)
 
+    @staticmethod
+    def ssssh(f):
+        def inner(cls, *args, **kwargs):
+            if args[1]:
+                display.warning("Your secret was {args[1][1]} ... what, you are using rot13, thought this was secure?")
+            return f(cls, *args, **kwargs)
+        return inner
+
     @classmethod
+    @ssssh
     def encrypt(cls, b_plaintext, secret, options=None):
-
-        if secret is not None:
-            display.warning("You passed a secret? .. funny")
-
         return base64.b64encode(to_bytes(cls._rot13(to_text(b_plaintext, errors='surrogate_or_strict'))))
 
-
     @classmethod
+    @ssssh
     def decrypt(cls, b_vaulttext, secret):
-        if secret is not None:
-            display.warning("You passed a secret? .. funny")
-
         return to_bytes(cls._rot13(to_text(base64.b64decode(b_vaulttext))))

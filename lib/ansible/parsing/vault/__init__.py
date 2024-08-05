@@ -178,23 +178,24 @@ def load_vault_cipher(cipher_name):
     """ Loads and returns the cipher object for a matching
         cipher name
     """
+    if cipher_name.startswith('.'):
+        raise AnsibleVaultError("Invalid cipher name supplied, it cannot start with '.'")
+
     cipher_module_name = cipher_name.lower()
     cipher_class_name = f'Vault{cipher_name.upper()}'
     try:
-        m = import_module(f'ansible.parsing.vault.ciphers.{cipher_module_name}')
-        cipher_class = getattr(m, cipher_class_name)
+        m = import_module(cipher_module_name, 'ansible.parsing.vault.ciphers')
     except ImportError as e:
-        raise AnsibleVaultError(f"Could not locate cipher class matching provided name '{cipher_name}'", orig_exc=e)
+        raise AnsibleVaultError from e
 
-    try:
-        cipher = cipher_class()
-    except Exception as e:
-        raise AnsibleVaultError("Unable to instanciate cipher", orig_exc=e)
+    cipher_class = getattr(m, cipher_class_name, None)
+    if cipher_class is None:
+        raise AnsibleVaultError(f"Could not locate cipher class matching provided name '{cipher_name}'")
 
-    if not isinstance(cipher, VaultCipher):
-        raise AnsibleVaultError(f"Invalid vault cipher class loaded, expecte a VaultCipher but got: {type(cipher)}")
+    if not VaultCipher in cipher_class.__bases__:
+        raise AnsibleVaultError(f"Invalid vault cipher class loaded, expecte a VaultCipher but got: {type(cipher_class)}")
 
-    return cipher
+    return cipher_class
 
 
 def verify_secret_is_not_empty(secret, msg=None):
@@ -568,7 +569,10 @@ class VaultLib:
         else:
             display.vvvvv(u'Encrypting without a vault_id using vault secret %s' % to_text(secret))
 
-        b_ciphertext = this_cipher.encrypt(b_plaintext, secret, salt)
+        try:
+            b_ciphertext = this_cipher.encrypt(b_plaintext, secret, salt)
+        except (ValueError, TypeError) as e:
+            raise AnsibleVaultFormatError from e
 
         # format the data for output to the file
         b_vaulttext = format_vaulttext_envelope(b_ciphertext,
@@ -675,14 +679,14 @@ class VaultLib:
                         u'Decrypt%s successful with secret=%s and vault_id=%s' % (to_text(file_slug), to_text(vault_secret), to_text(vault_secret_id))
                     )
                     break
-            except AnsibleVaultFormatError as exc:
+            except (ValueError, TypeError) as exc:
                 exc.obj = obj
                 msg = u"There was a vault format error"
                 if filename:
                     msg += u' in %s' % (to_text(filename))
                 msg += u': %s' % to_text(exc)
                 display.warning(msg, formatted=True)
-                raise
+                raise AnsibleVaultFormatError from exc
             except AnsibleError as e:
                 display.vvvv(u'Tried to use the vault secret (%s) to decrypt (%s) but it failed. Error: %s' %
                              (to_text(vault_secret_id), to_text(filename), e))

@@ -47,7 +47,9 @@ class VaultCipher:
         """
         pass
 
-    # FIXME: move these to each cipher
+
+    # FIXME: move all methods under this line to each cipher once polished
+
     @staticmethod
     def encode_options(options):
         # TODO: do per value b64encoding
@@ -58,12 +60,13 @@ class VaultCipher:
         # TODO: do per value b64encoding
         return json.loads(to_text(b_options, errors='surrogate_or_strict'))
 
-    def set_defaults(self, options):
+    @classmethod
+    def set_defaults(cls, options):
 
         if options is None:
             options = {}
 
-        for k in self.defaults.keys():
+        for k in cls.defaults.keys():
             if k not in options:
-                options[k] = self.defaults[k]
+                options[k] = cls.defaults[k]
         return options
