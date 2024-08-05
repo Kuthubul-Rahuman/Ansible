@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import base64
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 try:
     from cryptography.fernet import Fernet, InvalidToken
@@ -32,6 +32,8 @@ class Defaults():
     p: int = 1
     key: bytes = None
 
+    to_dict = asdict
+
 
 class VaultFERNETKEY(VaultCipher):
     """
@@ -40,7 +42,7 @@ class VaultFERNETKEY(VaultCipher):
 
     @classmethod
     def set_defaults(cls, options):
-        return Defaults(**options)
+        return Defaults(**options).to_dict()
 
     @classmethod
     def _key_from_password(cls, b_password, options=None):
@@ -57,13 +59,13 @@ class VaultFERNETKEY(VaultCipher):
         if o.salt not in PASS[b_password]:
             # derive as not in cache
 
-            kdf = Scrypt(salt=o.salt, length=o.length, n=o.n, r=o.r, p=o.p)
+            kdf = Scrypt(salt=o['salt'], length=o['length'], n=o['n'], r=o['r'], p=o['p'])
             try:
                 PASS[b_password][o.salt] = base64.urlsafe_b64encode(kdf.derive(b_password))
             except InvalidToken as e:
                 raise ValueError("Failed to derive key") from e
 
-        return PASS[b_password][o.salt], options
+        return PASS[b_password][o.salt], o
 
     @classmethod
     def encrypt(cls, b_plaintext, secret, options=None):
