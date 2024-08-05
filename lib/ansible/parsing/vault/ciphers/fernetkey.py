@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import base64
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 
 try:
     from cryptography.fernet import Fernet, InvalidToken
@@ -23,7 +23,7 @@ PASS = {}
 
 
 # slots and kw_only are 3.10 only, nice to use going forward
-@dataclass(frozen=True)
+@dataclass
 class Defaults():
     salt: bytes = b'ansible'
     length: int = 32
@@ -32,7 +32,8 @@ class Defaults():
     p: int = 1
     key: bytes = None
 
-    to_dict = asdict
+    def to_dict(self):
+        return self.__dict__.copy()
 
 
 class VaultFERNETKEY(VaultCipher):
