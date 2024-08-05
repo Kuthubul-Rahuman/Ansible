@@ -39,7 +39,7 @@ class VaultROT13(VaultCipher):
     def ssssh(f):
         def inner(cls, *args, **kwargs):
             if args[1]:
-                display.warning("Your secret was {args[1][1]} ... what, you are using rot13, thought this was secure?")
+                display.warning(f"Your secret was {args[1].bytes} ... what, you are using rot13, thought this was secure?")
             return f(cls, *args, **kwargs)
         return inner
 
