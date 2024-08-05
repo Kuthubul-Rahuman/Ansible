@@ -50,7 +50,7 @@ class TestHelperFunctions(unittest.TestCase):
         # known 'bad' strings
         self.bad_strings = [True, 'I have F', 'i ;', 'both ; and F', None, 'らとみ with F', ';café;']
 
-        self.p = opt_help.create_base_parser(FAKE_PROG)
+        self.p = opt_help.create_base_parser(prog=FAKE_PROG)
         self.p.add_argument('--test', dest='bogus', action='store',
                         type=opt_help.str_sans_forbidden_characters('F', ';'),
                         help='test arg')
