@@ -65,13 +65,10 @@ class VaultFERNET(VaultCipher):
             raise AnsibleVaultError("Failed to derive key", orig_exc=e)
 
     @_require_crypto
-    def encrypt(self, b_plaintext, secret, salt=None, options=None):
+    def encrypt(self, b_plaintext, secret, options=None):
 
         if secret is None:
             raise AnsibleVaultError('The secret passed to encrypt() was None')
-
-        if salt is not None:
-            raise AnsibleVaultError('Invalid salt passed to encrypt() with fernet')
 
         b_password = secret.bytes
         if len(b_password) < 10:

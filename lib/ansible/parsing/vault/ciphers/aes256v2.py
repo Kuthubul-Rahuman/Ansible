@@ -114,7 +114,7 @@ class VaultAES256V2(VaultCipher):
         return b_hmac, b_ciphertext
 
     @_require_crypto
-    def encrypt(self, b_plaintext, secret, salt=None, options=None):
+    def encrypt(self, b_plaintext, secret, options=None):
 
         if not secret:
             raise AnsibleVaultError('The AESv2 cipher reqquires a secret to encrypt()')
@@ -122,10 +122,7 @@ class VaultAES256V2(VaultCipher):
         if len(b_password) < 10:
             raise AnsibleVaultError('The AESv2 cipher reqquires a secret to be at least 10 bytes long')
 
-        if salt is not None:
-            display.warning("Ignoring provided salt, the AES256v2 cipher always generates it's own")
         b_salt = os.urandom(32)
-
         b_key1, b_key2, b_iv, options = self._gen_key_initctr(b_password, b_salt, options)
         b_hmac, b_ciphertext = self._encrypt_cryptography(b_plaintext, b_key1, b_key2, b_iv)
 

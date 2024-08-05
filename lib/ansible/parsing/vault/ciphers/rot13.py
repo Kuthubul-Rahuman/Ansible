@@ -35,7 +35,7 @@ class VaultROT13(VaultCipher):
 
         return ''.join(cipher)
 
-    def encrypt(self, b_plaintext, secret, salt=None, options=None):
+    def encrypt(self, b_plaintext, secret, options=None):
 
         if secret is not None:
             display.warning("You passed a secret? .. funny")

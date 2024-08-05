@@ -17,7 +17,7 @@ class VaultCipher:
     defaults: dict[str, str | int] = {}
 
     @abstractmethod
-    def encrypt(self, b_plaintext, secret, salt=None, options=None):
+    def encrypt(self, b_plaintext, secret, options=None):
         """
         :arg plaintext: A byte string to encrypt
         :arg secret: A populated VaultSecret object
@@ -45,6 +45,7 @@ class VaultCipher:
         """
         pass
 
+    # FIXME: move these to each cipher
     @staticmethod
     def encode_options(options):
         # TODO: do per value b64encoding

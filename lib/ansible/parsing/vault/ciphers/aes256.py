@@ -120,19 +120,12 @@ class VaultAES256(VaultCipher):
         return to_bytes(custom_salt)
 
     @_require_crypto
-    def encrypt(self, b_plaintext, secret, salt=None, options=None):
+    def encrypt(self, b_plaintext, secret, options=None):
 
         if secret is None:
             raise AnsibleVaultError('The secret passed to encrypt() was None')
 
-        if salt is None:
-            b_salt = self._get_salt()
-        elif not salt:
-            raise AnsibleVaultError('Empty or invalid salt passed to encrypt()')
-        else:
-            # TODO: add warning
-            b_salt = to_bytes(salt)
-
+        b_salt = self._get_salt()
         b_password = secret.bytes
         b_key1, b_key2, b_iv = self._gen_key_initctr(b_password, b_salt)
 
