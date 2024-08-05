@@ -1178,6 +1178,7 @@ VAULT_CIPHER:
   choices:
     'aes256': here for backwards compat
     'aes256v2': new aes256 with stronger defaults, probably will be new default
+    'aes256v3': new aes256 with stronger defaults, and caching derived pass
     'fernet': test implementation
     'fernetkey': test implementation with dual keys
     'rot13': you did not see this
