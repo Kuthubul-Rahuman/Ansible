@@ -184,9 +184,9 @@ def load_vault_cipher(cipher_name):
     cipher_module_name = cipher_name.lower()
     cipher_class_name = f'Vault{cipher_name.upper()}'
     try:
-        m = import_module(cipher_module_name, 'ansible.parsing.vault.ciphers')
+        m = import_module(f'ansible.parsing.vault.ciphers.{cipher_module_name}')
     except ImportError as e:
-        raise AnsibleVaultError from e
+        raise AnsibleVaultError(str(e)) from e
 
     cipher_class = getattr(m, cipher_class_name, None)
     if cipher_class is None:

@@ -16,8 +16,8 @@ class VaultCipher:
     """
     defaults: dict[str, str | int] = {}
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def encrypt(cls, b_plaintext, secret, options=None):
         """
         :arg plaintext: A byte string to encrypt
@@ -33,8 +33,8 @@ class VaultCipher:
         """
         pass
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def decrypt(cls, b_vaulttext, secret):
         """
         :arg b_vaulttext: A ciphered byte string that includes the encrypted
@@ -52,7 +52,9 @@ class VaultCipher:
 
     @staticmethod
     def encode_options(options):
-        # TODO: do per value b64encoding
+        for k in options.keys():
+            if isinstance(options[k], bytes):
+                options[k] = to_text(options[k], errors='surrogate_or_strict')
         return to_bytes(json.dumps(options))
 
     @staticmethod
