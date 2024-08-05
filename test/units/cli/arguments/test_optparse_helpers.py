@@ -16,10 +16,7 @@ from ansible import __path__ as ansible_path
 from ansible.release import __version__ as ansible_version
 
 cpath = C.DEFAULT_MODULE_PATH
-
 FAKE_PROG = u'ansible-cli-test'
-VERSION_OUTPUT = opt_help.version(prog=FAKE_PROG)
-
 
 @pytest.mark.parametrize(
     'must_have', [
@@ -33,13 +30,15 @@ VERSION_OUTPUT = opt_help.version(prog=FAKE_PROG)
     ]
 )
 def test_option_helper_version(must_have):
-    assert must_have in VERSION_OUTPUT
+    version_output = opt_help.version(prog=FAKE_PROG)
+    assert must_have in version_output
 
 
 class TestHelperFunctions(unittest.TestCase):
 
     def setUp(self):
 
+        # set some known and random 'good strings'
         self.good_strings = ['no bad chars', '-', 'らとみ', 'café']
         source = string.ascii_lowercase + string.ascii_uppercase + string.digits + string.punctuation
         while len(self.good_strings) < 10:
@@ -48,25 +47,25 @@ class TestHelperFunctions(unittest.TestCase):
                continue  # we only want 'GOOD' strings
             self.good_strings.append(rand)
 
+        # known 'bad' strings
         self.bad_strings = [True, 'I have F', 'i ;', 'both ; and F', None, 'らとみ with F', ';café;']
+
+        self.p = opt_help.create_base_parser(FAKE_PROG)
+        self.p.add_argument('--test', dest='bogus', action='store',
+                        type=opt_help.str_sans_forbidden_characters('F', ';'),
+                        help='test arg')
 
     def test_str_sans_forbidden_characters_detection(self):
 
-        @opt_help.str_sans_forbidden_characters('F', ';')
-        def iusestring(string):
-            return string
-
         for good in self.good_strings:
-            self.assertEqual(iusestring(good), good)
+            self.assertTrue(self.p.parse(['--test', good])
 
         for bad in self.bad_strings:
-            self.assertRaises(ValueError, iusestring(bad))
+            self.assertRaises(ValueError, self.p.parse(['--test', bad])
 
     def test_str_sans_forbidden_characters_input(self):
 
-        @opt_help.str_sans_forbidden_characters(None)
-        def iusestring(string):
-            return string
-
-        for anystring in self.good_strings + self.bad_strings:
-            self.assertRaises(TypeError, iusestring(anystring))
+        self.p.add_argument('--bad', dest='bogus', action='store',
+                            type=opt_help.str_sans_forbidden_characters(None),
+                            help='bad test arg')
+        self.assertRaises(TypeError, self.p.parse('--test', 'safe value'))
