@@ -61,7 +61,7 @@ class TestHelperFunctions(unittest.TestCase):
             self.assertTrue(self.p.parse(['--test', good]))
 
         for bad in self.bad_strings:
-            self.assertRaises(ValueError, self.p.parse_args(['--test', bad])
+            self.assertRaises(ValueError, self.p.parse_args(['--test', bad]))
 
     def test_str_sans_forbidden_characters_input(self):
 
