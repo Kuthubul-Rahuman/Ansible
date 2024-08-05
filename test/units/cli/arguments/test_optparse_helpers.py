@@ -58,7 +58,7 @@ class TestHelperFunctions(unittest.TestCase):
     def test_str_sans_forbidden_characters_detection(self):
 
         for good in self.good_strings:
-            self.assertTrue(self.p.parse(['--test', good])
+            self.assertTrue(self.p.parse(['--test', good]))
 
         for bad in self.bad_strings:
             self.assertRaises(ValueError, self.p.parse_args(['--test', bad])
