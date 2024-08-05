@@ -17,7 +17,8 @@ class VaultCipher:
     defaults: dict[str, str | int] = {}
 
     @abstractmethod
-    def encrypt(self, b_plaintext, secret, options=None):
+    @classmethod
+    def encrypt(cls, b_plaintext, secret, options=None):
         """
         :arg plaintext: A byte string to encrypt
         :arg secret: A populated VaultSecret object
@@ -33,7 +34,8 @@ class VaultCipher:
         pass
 
     @abstractmethod
-    def decrypt(self, b_vaulttext, secret):
+    @classmethod
+    def decrypt(cls, b_vaulttext, secret):
         """
         :arg b_vaulttext: A ciphered byte string that includes the encrypted
                 data and other needed items for decryption

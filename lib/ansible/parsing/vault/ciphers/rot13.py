@@ -35,19 +35,18 @@ class VaultROT13(VaultCipher):
 
         return ''.join(cipher)
 
-    def encrypt(self, b_plaintext, secret, options=None):
+    @classmethod
+    def encrypt(cls, b_plaintext, secret, options=None):
 
         if secret is not None:
             display.warning("You passed a secret? .. funny")
 
-        if salt is not None:
-            display.warning("You passed a salt? ... LOL")
-
-        return base64.b64encode(to_bytes(self._rot13(to_text(b_plaintext, errors='surrogate_or_strict'))))
+        return base64.b64encode(to_bytes(cls._rot13(to_text(b_plaintext, errors='surrogate_or_strict'))))
 
 
-    def decrypt(self, b_vaulttext, secret):
+    @classmethod
+    def decrypt(cls, b_vaulttext, secret):
         if secret is not None:
             display.warning("You passed a secret? .. funny")
 
-        return to_bytes(self._rot13(to_text(base64.b64decode(b_vaulttext))))
+        return to_bytes(cls._rot13(to_text(base64.b64decode(b_vaulttext))))
