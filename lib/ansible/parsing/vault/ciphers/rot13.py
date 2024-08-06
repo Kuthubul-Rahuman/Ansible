@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import base64
+import time
 
 from ansible.module_utils.common.text.converters import to_bytes, to_text
 from ansible.parsing.vault.ciphers import VaultCipher
@@ -36,8 +37,13 @@ class VaultROT13(VaultCipher):
         return ''.join(cipher)
 
     @staticmethod
+    def _pretend_to_generate_key():
+        time.sleep(1)
+
+    @staticmethod
     def ssssh(f):
         def inner(cls, *args, **kwargs):
+            cls._pretend_to_generate_key()
             if args[1]:
                 display.warning(f"Your secret was {args[1].bytes} ... what, you are using rot13, thought this was secure?")
             return f(cls, *args, **kwargs)
