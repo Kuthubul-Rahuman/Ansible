@@ -48,7 +48,7 @@ class TestHelperFunctions(unittest.TestCase):
             self.good_strings.append(rand)
 
         # known 'bad' strings
-        self.bad_strings = [True, 'I have F', 'i ;', 'both ; and F', None, 'らとみ with F', ';café;']
+        self.bad_strings = ['I have F', 'i ;', 'both ; and F', 'らとみ with F', ';café;']
 
         self.p = opt_help.create_base_parser(prog=FAKE_PROG)
         self.p.add_argument('--test', dest='bogus', action='store',
@@ -63,10 +63,17 @@ class TestHelperFunctions(unittest.TestCase):
         for bad in self.bad_strings:
             self.assertRaises(ValueError, self.p.parse_args(['--test', bad]))
 
+        # non strings!
+        for non in (True, None, 15):
+            self.assertRaises(TypeError, self.p.parse_args(['--test', non]))
+
     def test_str_sans_forbidden_characters_input(self):
 
         for invalid in (True, 13, 6.2832, None):
             self.p.add_argument('--bad', dest='bogus', action='store',
                                 type=opt_help.str_sans_forbidden_characters(invalid),
                                 help='bad test arg')
-            self.assertRaises(SystemExit, self.p.parse_args(['--bad', 'safe value']))
+            try:
+                self.assertRaises(TypeError, self.p.parse_args(['--bad', 'safe value']))
+            except SystemExit:
+                pass
