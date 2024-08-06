@@ -58,7 +58,7 @@ class TestHelperFunctions(unittest.TestCase):
     def test_str_sans_forbidden_characters_detection(self):
 
         for good in self.good_strings:
-            self.assertTrue(self.p.parse(['--test', good]))
+            self.assertTrue(self.p.parse_args(['--test', good]))
 
         for bad in self.bad_strings:
             self.assertRaises(ValueError, self.p.parse_args(['--test', bad]))
@@ -69,4 +69,4 @@ class TestHelperFunctions(unittest.TestCase):
             self.p.add_argument('--bad', dest='bogus', action='store',
                                 type=opt_help.str_sans_forbidden_characters(invalid),
                                 help='bad test arg')
-            self.assertRaises(TypeError, self.p.parse_args(['--bad', 'safe value']))
+            self.assertRaises(SystemExit, self.p.parse_args(['--bad', 'safe value']))
