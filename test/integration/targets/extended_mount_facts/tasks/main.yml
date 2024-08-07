@@ -1,0 +1,15 @@
+- extended_mount_facts:
+    devices:
+      - "[!/]*"
+    fstypes:
+      - "*"
+    timeout: 1
+
+- name: validate mount devices match the filter
+  assert:
+    that:
+      - filtered == devices
+      - (extended_mounts | length) > 0
+  vars:
+    devices: "{{ extended_mounts.values() | map(attribute='info') | map(attribute='device') }}"
+    filtered: "{{ devices | map('regex_search', '^[^/].*') }}"
