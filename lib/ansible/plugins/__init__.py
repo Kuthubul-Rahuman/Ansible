@@ -50,15 +50,20 @@ def get_plugin_class(obj):
 
 class AnsiblePlugin(ABC):
 
-    # allow extra passthrough parameters
-    allow_extras = False
-
     # Set by plugin loader
     _load_name: str
+
+    # allow extra passthrough parameters
+    allow_extras = False
+    extras_prefix: str
 
     def __init__(self):
         self._options = {}
         self._defs = None
+        self.extras_prefix = None
+
+        if getattr(self, '_load_name', False):
+            self.extras_prefix = self._load_name
 
     def matches_name(self, possible_names):
         possible_fqcns = set()
