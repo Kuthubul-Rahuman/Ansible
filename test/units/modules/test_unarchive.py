@@ -2,8 +2,6 @@
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 from __future__ import annotations
 
-
-import time
 import pytest
 
 from ansible.modules.unarchive import ZipArchive, TgzArchive
@@ -52,29 +50,29 @@ class TestCaseZipArchive:
         ("test_input", "expected"),
         [
             pytest.param(
-                "19800000.000000",
-                time.mktime(time.struct_time((1980, 0, 0, 0, 0, 0, 0, 0, 0))),
+                (1980, 0, 0, 0, 0, 0),
+                (1980, 1, 1, 0, 0, 0),
                 id="invalid-month-1980",
             ),
             pytest.param(
-                "19791231.000000",
-                time.mktime(time.struct_time((1980, 1, 1, 0, 0, 0, 0, 0, 0))),
+                (1980, 1, 1, 0, 0, 0),
+                (1980, 1, 1, 0, 0, 0),
                 id="invalid-year-1979",
             ),
             pytest.param(
-                "19810101.000000",
-                time.mktime(time.struct_time((1981, 1, 1, 0, 0, 0, 0, 0, 0))),
+                (1981, 1, 1, 0, 0, 0),
+                (1981, 1, 1, 0, 0, 0),
                 id="valid-datetime",
             ),
             pytest.param(
-                "21081231.000000",
-                time.mktime(time.struct_time((2107, 12, 31, 23, 59, 59, 0, 0, 0))),
+                (2108, 12, 31, 23, 59, 59),
+                (2107, 12, 31, 23, 59, 59),
                 id="invalid-year-2108",
             ),
             pytest.param(
-                "INVALID_TIME_DATE",
-                time.mktime(time.struct_time((1980, 1, 1, 0, 0, 0, 0, 0, 0))),
-                id="invalid-datetime",
+                (0,),
+                (1980, 1, 1, 0, 0, 0),
+                id="invalid-length-datetime",
             ),
         ],
     )
