@@ -39,6 +39,7 @@ _ALLOW_CONCRETE_POINTER_IN_SOURCE = False  # NOTE: This is a feature flag
 _GALAXY_YAML = b'galaxy.yml'
 _MANIFEST_JSON = b'MANIFEST.json'
 _SOURCE_METADATA_FILE = b'GALAXY.yml'
+SUPPORTED_REQUIREMENTS_KEYS = frozenset({'name', 'version', 'type', 'source', 'signatures'})
 
 display = Display()
 
@@ -313,6 +314,15 @@ class _ComputedReqKindsMixin:
         # TODO: decide how to deprecate the old src API behavior
         req_source = collection_req.get('source', None)
         req_signature_sources = collection_req.get('signatures', None)
+        key_diff = frozenset(collection_req.keys()).difference(SUPPORTED_REQUIREMENTS_KEYS)
+        if key_diff:
+            raise AnsibleError(
+                "The keys (%s) are not valid when installing collection "
+                "requirement entries. Be sure to only use the following "
+                "supported keys (%s)."
+                % (', '.join(key_diff), ', '.join(SUPPORTED_REQUIREMENTS_KEYS))
+            )
+
         if req_signature_sources is not None:
             if validate_signature_options and art_mgr.keyring is None:
                 raise AnsibleError(

@@ -23,7 +23,7 @@ from ansible import context
 from ansible.cli.galaxy import GalaxyCLI
 from ansible.errors import AnsibleError
 from ansible.galaxy import collection, api, dependency_resolution
-from ansible.galaxy.dependency_resolution.dataclasses import Candidate, Requirement
+from ansible.galaxy.dependency_resolution.dataclasses import Candidate, Requirement, SUPPORTED_REQUIREMENTS_KEYS
 from ansible.module_utils.common.file import S_IRWU_RG_RO, S_IRWXU_RXG_RXO
 from ansible.module_utils.common.text.converters import to_bytes, to_native, to_text
 from ansible.module_utils.common.process import get_bin_path
@@ -396,6 +396,19 @@ def test_build_requirement_from_tar_invalid_manifest(tmp_path_factory):
     expected = "Collection tar file member MANIFEST.json does not contain a valid json string."
     with pytest.raises(AnsibleError, match=expected):
         Requirement.from_requirement_dict({'name': to_text(tar_path)}, concrete_artifact_cm)
+
+
+def test_build_requirement_from_tar_invalid_collection_entry(collection_artifact):
+    tmp_path = os.path.join(os.path.split(collection_artifact[1])[0], b'temp')
+    concrete_artifact_cm = collection.concrete_artifact_manager.ConcreteArtifactsManager(tmp_path, validate_certs=False)
+    expected = (
+        "The keys (invalid_key) are not valid when installing collection "
+        "requirement entries. Be sure to only use the following "
+        "supported keys (%s)."
+        % ', '.join(SUPPORTED_REQUIREMENTS_KEYS)
+    )
+    with pytest.raises(AnsibleError, match=re.escape(expected)):
+        Requirement.from_requirement_dict({'name': to_text(collection_artifact[1]), "invalid_key": "foo"}, concrete_artifact_cm)
 
 
 def test_build_requirement_from_name(galaxy_server, monkeypatch, tmp_path_factory):
